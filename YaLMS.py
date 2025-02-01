@@ -328,7 +328,6 @@ class Particle(pygame.sprite.Sprite):
         if self.age >= self.lifetime:
             self.kill()
 
-# Модифицируем класс Explosion для врагов
 class EnemyExplosion(pygame.sprite.Sprite):
     def __init__(self, x, y, enemy_type):
         super().__init__()
@@ -344,7 +343,7 @@ class EnemyExplosion(pygame.sprite.Sprite):
             self.images.append(pygame.transform.scale(surf, (i*2, i*2)))
         
         self.image = self.images[0]
-        self.rect = self.image.get_rect(center=(x, y))
+        self.rect = self.image.get_rect(center=(x, y))  # Центрируем взрыв на точке смерти врага
         self.last_update = pygame.time.get_ticks()
         self.frame_rate = 50
 
@@ -364,7 +363,7 @@ def draw_xp_bar(surf, x, y, current_xp, xp_needed, current_level):
     fill = (current_xp / xp_needed) * BAR_WIDTH
     outline_rect = pygame.Rect(x, y, BAR_WIDTH, BAR_HEIGHT)
     fill_rect = pygame.Rect(x, y, fill, BAR_HEIGHT)
-    pygame.draw.rect(surf, (50, 200, 50), fill_rect)
+    pygame.draw.rect(surf, (255, 255, 0), fill_rect)
     pygame.draw.rect(surf, WHITE, outline_rect, 2)
     font = pygame.font.Font(None, 24)
     text = font.render(f"Ship Level {current_level} → {current_level+1}", True, WHITE)
@@ -546,17 +545,17 @@ while running:
             score += enemy.score_value
             current_xp += enemy.score_value
             explosion_sound.play()
-        
+    
             # Создаем эффекты
             explosion = EnemyExplosion(enemy.rect.centerx, enemy.rect.centery, enemy.enemy_type)
             all_sprites.add(explosion)
-        
+    
             # Создаем частицы
             for _ in range(PARTICLE_COUNT):
                 color = random.choice(EXPLOSION_COLORS)
                 particle = Particle(enemy.rect.centerx, enemy.rect.centery, color)
                 all_sprites.add(particle)
-        
+                
             # Эффект для strong врагов
             if enemy.enemy_type == 'strong':
                 for _ in range(PARTICLE_COUNT * 2):
@@ -565,22 +564,23 @@ while running:
                     particle.speed_x *= 1.5
                     particle.speed_y *= 1.5
                     all_sprites.add(particle)
-        
+    
             # Создаем бомбу для strong врагов
             if enemy.enemy_type == 'strong':
                 bomb = Bomb(enemy.rect.centerx, enemy.rect.centery)
                 all_sprites.add(bomb)
                 bombs.add(bomb)
-        
+    
             enemy.kill()
             if random.random() < 0.1:
                 create_bonus()
 
-    new_ship_level = score // 450 + 1
-    if new_ship_level > player.ship_level:
-        levels_gained = new_ship_level - player.ship_level
+    xp_needed_current = 450 * player.ship_level
+    if current_xp >= xp_needed_current:
+        levels_gained = current_xp // xp_needed_current
         for _ in range(levels_gained):
             player.level_up()
+        current_xp %= xp_needed_current
 
     # Обработка событий
     for event in pygame.event.get():
@@ -627,7 +627,8 @@ while running:
     # Рендеринг
     screen.blit(current_bg, (0, 0))
     all_sprites.draw(screen)
-    draw_xp_bar(screen, WIDTH//2 - 150, 40, current_xp, xp_needed, player.ship_level)
+    xp_needed_current = 450 * player.ship_level
+    draw_xp_bar(screen, WIDTH//2 - 150, 40, current_xp, xp_needed_current, player.ship_level)
     draw_health_bar(screen, 5, 5, player.health, player.max_health)
     draw_text(screen, f"Score: {score}", 18, WIDTH // 2, 10)
     draw_text(screen, f"Level: {level}", 18, WIDTH - 60, 10)
@@ -639,9 +640,9 @@ while running:
     if player.bonus_timer > pygame.time.get_ticks():
         time_left = (player.bonus_timer - pygame.time.get_ticks()) // 1000 + 1
         if player.ship_type == "shotguner":
-            draw_text(screen, f"DOUBLE DAMAGE: {time_left}s", 22, WIDTH//2, 40)
+            draw_text(screen, f"DOUBLE DAMAGE: {time_left}s", 22, WIDTH//2, 70)  # Y=70
         elif player.double_bullet:
-            draw_text(screen, f"DOUBLE BULLET: {time_left}s", 22, WIDTH//2, 40)
+            draw_text(screen, f"DOUBLE BULLET: {time_left}s", 22, WIDTH//2, 70)
     pygame.display.flip()
 
 pygame.quit()
