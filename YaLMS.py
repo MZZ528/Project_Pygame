@@ -7,6 +7,11 @@ pygame.init()
 pygame.mixer.init()
 
 # Константы
+DIFFICULTY_LEVELS = {
+    'easy': {'enemy_health': 0.7, 'enemy_speed': 0.8, 'spawn_rate': 1.2, 'damage_multiplier': 0.8},
+    'normal': {'enemy_health': 1.0, 'enemy_speed': 1.0, 'spawn_rate': 1.0, 'damage_multiplier': 1.0},
+    'hard': {'enemy_health': 1.3, 'enemy_speed': 1.2, 'spawn_rate': 0.8, 'damage_multiplier': 1.2}
+}
 WIDTH = 1920
 HEIGHT = 1080
 FPS = 60
@@ -48,6 +53,7 @@ current_bg_index = 0
 current_bg = BACKGROUNDS[current_bg_index]
 
 # Загрузка звуков
+UPGRADE_SOUND = pygame.mixer.Sound("upgrade.wav")
 shoot_sound = pygame.mixer.Sound("laser.wav")
 explosion_sound = pygame.mixer.Sound("explosion.wav")
 bonus_sound = pygame.mixer.Sound("archivo.wav")
@@ -127,6 +133,18 @@ class Player(pygame.sprite.Sprite):
                 self.bullet_damage = self.base_bullet_damage
             else:
                 self.double_bullet = False
+                
+    def apply_upgrade(self, upgrade_type, value):
+        if upgrade_type == "shoot_delay":
+            self.base_shoot_delay = int(self.base_shoot_delay * value)
+            self.shoot_delay = self.base_shoot_delay
+        elif upgrade_type == "health":
+            self.base_max_health += value
+            self.max_health = self.base_max_health
+            self.health = min(self.health + value, self.max_health)
+        elif upgrade_type == "damage":
+            self.base_bullet_damage = int(self.base_bullet_damage * value)
+            self.bullet_damage = self.base_bullet_damage
 
     def shoot(self):
         if self.ship_type == "shotguner":
@@ -150,18 +168,19 @@ class Player(pygame.sprite.Sprite):
         shoot_sound.play()
 
 class Enemy(pygame.sprite.Sprite):
-    def __init__(self, enemy_type):
+    def __init__(self, enemy_type, difficulty):
         super().__init__()
+        self.difficulty = difficulty
         self.enemy_type = enemy_type
         self.last_shot = pygame.time.get_ticks()
         self.shoot_delay = 2000
 
+        # Инициализация базовых значений в зависимости от типа
         if enemy_type == 'normal':
             self.image = pygame.transform.scale(enemy_img, (40, 30))
             self.speed_y = 2
             self.speed_x = random.randrange(-2, 2)
             self.max_health = 180
-            self.health = self.max_health
             self.score_value = 10
 
         elif enemy_type == 'fast':
@@ -169,7 +188,6 @@ class Enemy(pygame.sprite.Sprite):
             self.speed_y = 5
             self.speed_x = random.randrange(-4, 4)
             self.max_health = 90
-            self.health = self.max_health
             self.score_value = 15
 
         elif enemy_type == 'strong':
@@ -177,7 +195,6 @@ class Enemy(pygame.sprite.Sprite):
             self.speed_y = 1
             self.speed_x = random.randrange(-1, 1)
             self.max_health = 360
-            self.health = self.max_health
             self.score_value = 30
 
         elif enemy_type == 'shooter':
@@ -185,10 +202,17 @@ class Enemy(pygame.sprite.Sprite):
             self.speed_y = 2
             self.speed_x = 0
             self.max_health = 180
-            self.health = self.max_health
             self.score_value = 25
             self.shoot_delay = 1500
 
+        # Применяем модификаторы сложности ПОСЛЕ инициализации базовых значений
+        diff = DIFFICULTY_LEVELS[difficulty]
+        self.max_health = int(self.max_health * diff['enemy_health'])
+        self.speed_y *= diff['enemy_speed']
+        self.speed_x *= diff['enemy_speed']
+        self.score_value = int(self.score_value * (2 - diff['enemy_health']))
+        
+        self.health = self.max_health
         self.rect = self.image.get_rect()
         self.rect.x = random.randrange(WIDTH - self.rect.width)
         self.rect.y = random.randrange(-150, -40)
@@ -297,8 +321,10 @@ class Explosion(pygame.sprite.Sprite):
             self.kill()
 
 class Bonus(pygame.sprite.Sprite):
-    def __init__(self):
+    def __init__(self, difficulty):
         super().__init__()
+        self.difficulty = difficulty
+        self.speed = 3 * DIFFICULTY_LEVELS[difficulty]['spawn_rate']
         self.image = pygame.transform.scale(BONUS_IMAGE, (30, 30))
         self.rect = self.image.get_rect()
         self.rect.x = random.randint(50, WIDTH-50)
@@ -356,6 +382,24 @@ class EnemyExplosion(pygame.sprite.Sprite):
                 self.image = self.images[self.frame]
             else:
                 self.kill()
+                
+class UpgradeSystem:
+    def __init__(self):
+        self.available_upgrades = [
+            {"name": "Rapid Fire", "description": "+10% fire rate", 
+             "type": "shoot_delay", "value": 0.90, "color": (0,255,255)},
+            {"name": "Armor Plating", "description": "+35 max health", 
+             "type": "health", "value": 35, "color": (0,255,0)},
+            {"name": "Damage Boost", "description": "+10% damage", 
+             "type": "damage", "value": 1.1, "color": (255,0,0)},
+            {"name": "Speed Boost", "description": "+15% speed", 
+             "type": "speed", "value": 1.10, "color": (255,255,0)}
+        ]
+
+    def get_random_upgrades(self, count=3):
+        return random.sample(self.available_upgrades, count)
+    
+upgrade_system = UpgradeSystem()
 
 def draw_xp_bar(surf, x, y, current_xp, xp_needed, current_level):
     BAR_WIDTH = 300
@@ -369,6 +413,88 @@ def draw_xp_bar(surf, x, y, current_xp, xp_needed, current_level):
     text = font.render(f"Ship Level {current_level} → {current_level+1}", True, WHITE)
     surf.blit(text, (x + BAR_WIDTH + 10, y-3))
 
+def show_game_over_screen(score, level):
+    screen.blit(BACKGROUNDS[0], (0, 0))
+    
+    # Заголовок
+    draw_text(screen, "GAME OVER", 72, WIDTH/2, HEIGHT/4)
+    
+    # Статистика
+    draw_text(screen, f"Final Score: {score}", 36, WIDTH/2, HEIGHT/2 - 60)
+    draw_text(screen, f"Reached Level: {level}", 36, WIDTH/2, HEIGHT/2 - 20)
+    
+    # Инструкции
+    draw_text(screen, "Press SPACE to play again", 28, WIDTH/2, HEIGHT - 200)
+    draw_text(screen, "Press ESC to quit", 28, WIDTH/2, HEIGHT - 150)
+    
+    pygame.display.flip()
+    
+    waiting = True
+    while waiting:
+        clock.tick(FPS)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    return False
+                if event.key == pygame.K_SPACE:
+                    return True
+
+def show_upgrade_screen(player):
+    player.shooting = False
+    screen.blit(current_bg, (0, 0))
+    all_sprites.draw(screen)
+    
+    # Создаем полупрозрачный фон
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    pygame.draw.rect(overlay, (0, 0, 0, 200), overlay.get_rect())
+    screen.blit(overlay, (0, 0))
+    
+    draw_text(screen, "LEVEL UP!", 72, WIDTH/2, HEIGHT/4)
+    draw_text(screen, "Choose an upgrade:", 36, WIDTH/2, HEIGHT/3)
+    
+    upgrades = upgrade_system.get_random_upgrades(3)
+    
+    # Рисуем карточки улучшений
+    card_width = 400
+    card_height = 250
+    padding = 50
+    
+    for i, upgrade in enumerate(upgrades):
+        x = WIDTH/2 - (card_width + padding) + i*(card_width + padding)
+        y = HEIGHT/2 - card_height/2
+        
+        # Рамка карточки
+        pygame.draw.rect(screen, upgrade['color'], (x, y, card_width, card_height), 3)
+        pygame.draw.rect(screen, (30, 30, 30), (x+3, y+3, card_width-6, card_height-6))
+        
+        # Текст
+        draw_text(screen, upgrade['name'], 32, x + card_width/2, y + 30)
+        draw_text(screen, upgrade['description'], 24, x + card_width/2, y + 80)
+        draw_text(screen, f"Press {i+1}", 28, x + card_width/2, y + card_height - 50)
+    
+    pygame.display.flip()
+    
+    waiting = True
+    while waiting:
+        clock.tick(FPS)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_1:
+                    player.apply_upgrade(upgrades[0]['type'], upgrades[0]['value'])
+                    waiting = False
+                elif event.key == pygame.K_2:
+                    player.apply_upgrade(upgrades[1]['type'], upgrades[1]['value'])
+                    waiting = False
+                elif event.key == pygame.K_3:
+                    player.apply_upgrade(upgrades[2]['type'], upgrades[2]['value'])
+                    waiting = False
+                    
 def draw_health_bar(surf, x, y, current, max_hp):
     if current < 0:
         current = 0
@@ -386,6 +512,42 @@ def draw_text(surf, text, size, x, y):
     text_rect = text_surface.get_rect()
     text_rect.midtop = (x, y)
     surf.blit(text_surface, text_rect)
+
+def select_difficulty():
+    screen.blit(BACKGROUNDS[0], (0, 0))
+    draw_text(screen, "Select difficulty:", 48, WIDTH/2, HEIGHT/4)
+    
+    # Опции сложности
+    difficulties = [
+        ("1. Easy", "Enemies are weaker and slower", (WIDTH/2 - 200, HEIGHT/2)),
+        ("2. Normal", "Standard game balance", (WIDTH/2, HEIGHT/2)),
+        ("3. Hard", "Challenge for veterans", (WIDTH/2 + 200, HEIGHT/2))
+    ]
+    
+    for i, (title, desc, pos) in enumerate(difficulties):
+        draw_text(screen, title, 32, pos[0], pos[1] - 30)
+        draw_text(screen, desc, 22, pos[0], pos[1] + 20)
+    
+    pygame.display.flip()
+    
+    waiting = True
+    selected = None
+    while waiting:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return None
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_1:
+                    selected = 'easy'
+                    waiting = False
+                elif event.key == pygame.K_2:
+                    selected = 'normal'
+                    waiting = False
+                elif event.key == pygame.K_3:
+                    selected = 'hard'
+                    waiting = False
+    return selected
 
 def show_ship_selection():
     screen.blit(BACKGROUNDS[0], (0, 0))
@@ -468,12 +630,14 @@ bullets = pygame.sprite.Group()
 enemy_bullets = pygame.sprite.Group()
 bonuses = pygame.sprite.Group()
 
-def create_bonus():
-    bonus = Bonus()
+def create_bonus(difficulty):
+    bonus = Bonus(difficulty)
     all_sprites.add(bonus)
     bonuses.add(bonus)
 
-def create_enemies(num):
+def create_enemies(num, difficulty):
+    diff = DIFFICULTY_LEVELS[difficulty]['spawn_rate']
+    num = int(num * diff)
     for _ in range(num):
         if level < 3:
             types = ['normal', 'fast']
@@ -483,7 +647,7 @@ def create_enemies(num):
             types = ENEMY_TYPES
 
         enemy_type = random.choice(types)
-        enemy = Enemy(enemy_type)
+        enemy = Enemy(enemy_type, difficulty)
         all_sprites.add(enemy)
         enemies.add(enemy)
 
@@ -496,30 +660,43 @@ level = 1
 current_xp = 0
 xp_needed = 450
 next_bonus_score = 350
+color_1 = (0, 0, 0)
 
 while running:
     if game_over:
-        show_start_screen()
-        ship_type = show_ship_selection()
-        if not ship_type:
+        pygame.mixer.music.stop()
+        screen.fill(color_1)
+        difficulty = select_difficulty()
+        # Показать экран Game Over
+        restart = show_game_over_screen(score, level)
+        if not difficulty:
             running = False
             continue
-
-        # Инициализация игрока с выбранным типом
+        if not restart:
+            running = False
+            continue
+            
+        # Перезапуск игры
+        pygame.mixer.music.play(loops=-1)
         all_sprites = pygame.sprite.Group()
         enemies = pygame.sprite.Group()
         bullets = pygame.sprite.Group()
         enemy_bullets = pygame.sprite.Group()
         bombs = pygame.sprite.Group()
 
+        ship_type = show_ship_selection()
+        if not ship_type:
+            running = False
+            continue
+
         player = Player(ship_type)
         all_sprites.add(player)
-
         score = 0
         level = 1
-        current_xp = 0  # Сброс текущего опыта при начале новой игры
-        create_enemies(8)
+        current_xp = 0
+        create_enemies(8, difficulty)
         game_over = False
+        
 
     clock.tick(FPS)
 
@@ -572,15 +749,19 @@ while running:
                 bombs.add(bomb)
     
             enemy.kill()
-            if random.random() < 0.1:
-                create_bonus()
+            if random.random() < 0.1 * (1.5 if difficulty == 'hard' else 1.0):
+                create_bonus(difficulty)
 
     xp_needed_current = 450 * player.ship_level
     if current_xp >= xp_needed_current:
         levels_gained = current_xp // xp_needed_current
+        UPGRADE_SOUND.play()  # Звук играет один раз при любом количестве уровней
         for _ in range(levels_gained):
             player.level_up()
+            player.shooting = False  # Сбрасываем состояние стрельбы
+            show_upgrade_screen(player)
         current_xp %= xp_needed_current
+
 
     # Обработка событий
     for event in pygame.event.get():
@@ -607,14 +788,18 @@ while running:
     # Проверка столкновений игрока с врагами и пулями
     hits = pygame.sprite.spritecollide(player, enemies, True)
     for hit in hits:
-        player.health -= 20
+        damage = 20 * DIFFICULTY_LEVELS[difficulty]['damage_multiplier']
+        player.health -= damage
         if player.health <= 0:
+            pygame.mixer.music.stop()
             game_over = True
 
     hits = pygame.sprite.spritecollide(player, enemy_bullets, True)
     for hit in hits:
-        player.health -= 20
+        damage = 20 * DIFFICULTY_LEVELS[difficulty]['damage_multiplier']
+        player.health -= damage
         if player.health <= 0:
+            pygame.mixer.music.stop()
             game_over = True
 
     # Создание новых врагов при необходимости
@@ -622,7 +807,7 @@ while running:
         level += 1
         if level % 5 == 0:
             fade_state = 'fade_out'
-        create_enemies(8 + level * 2 + random.randint(0, level * 3))
+        create_enemies(8 + level * 2 + random.randint(0, level * 3), difficulty)
 
     # Рендеринг
     screen.blit(current_bg, (0, 0))
