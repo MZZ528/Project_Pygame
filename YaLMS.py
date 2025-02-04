@@ -8,12 +8,12 @@ pygame.mixer.init()
 
 # Константы
 DIFFICULTY_LEVELS = {
-    'easy': {'enemy_health': 0.7, 'enemy_speed': 0.8, 'spawn_rate': 1.2, 'damage_multiplier': 0.8},
+    'easy': {'enemy_health': 0.7, 'enemy_speed': 1.0, 'spawn_rate': 1.0, 'damage_multiplier': 0.8},
     'normal': {'enemy_health': 1.0, 'enemy_speed': 1.0, 'spawn_rate': 1.0, 'damage_multiplier': 1.0},
     'hard': {'enemy_health': 1.3, 'enemy_speed': 1.2, 'spawn_rate': 0.8, 'damage_multiplier': 1.2}
 }
-WIDTH = 1920
-HEIGHT = 1080
+WIDTH = 1280
+HEIGHT = 720
 FPS = 60
 EXPLOSION_COLORS = [(255, 0, 0), (255, 165, 0), (255, 255, 0)]  # Цвета для взрывов
 PARTICLE_COUNT = 15  # Количество частиц при взрыве
