@@ -515,7 +515,7 @@ def select_difficulty():
     
     # Опции сложности
     difficulties = [
-        ("1. Easy", "Enemies are weaker and slower", (WIDTH/2 - 200, HEIGHT/2)),
+        ("1. Easy", "Enemies are weaker and slower", (WIDTH/2 - 225, HEIGHT/2)),
         ("2. Normal", "Standard game balance", (WIDTH/2, HEIGHT/2)),
         ("3. Hard", "Challenge for veterans", (WIDTH/2 + 200, HEIGHT/2))
     ]
