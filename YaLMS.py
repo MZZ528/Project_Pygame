@@ -12,8 +12,8 @@ DIFFICULTY_LEVELS = {
     'normal': {'enemy_health': 1.0, 'enemy_speed': 1.0, 'spawn_rate': 1.0, 'damage_multiplier': 1.0},
     'hard': {'enemy_health': 1.3, 'enemy_speed': 1.2, 'spawn_rate': 0.8, 'damage_multiplier': 1.2}
 }
-WIDTH = 1280
-HEIGHT = 720
+WIDTH = 1600
+HEIGHT = 880
 FPS = 60
 EXPLOSION_COLORS = [(255, 0, 0), (255, 165, 0), (255, 255, 0)]  # Цвета для взрывов
 PARTICLE_COUNT = 15  # Количество частиц при взрыве
@@ -415,10 +415,6 @@ def draw_xp_bar(surf, x, y, current_xp, xp_needed, current_level):
 
 def show_game_over_screen(score, level):
     screen.blit(BACKGROUNDS[0], (0, 0))
-    
-    # Заголовок
-    draw_text(screen, "GAME OVER", 72, WIDTH/2, HEIGHT/4)
-    
     # Статистика
     draw_text(screen, f"Final Score: {score}", 36, WIDTH/2, HEIGHT/2 - 60)
     draw_text(screen, f"Reached Level: {level}", 36, WIDTH/2, HEIGHT/2 - 20)
