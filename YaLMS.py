@@ -634,7 +634,7 @@ def create_bonus(difficulty):
 def create_enemies(num, difficulty):
     diff = DIFFICULTY_LEVELS[difficulty]['spawn_rate']
     num = int(num * diff)
-    for _ in range(num):
+    for i in range(num):
         if level < 3:
             types = ['normal', 'fast']
         elif level < 5:
@@ -724,14 +724,14 @@ while running:
             all_sprites.add(explosion)
     
             # Создаем частицы
-            for _ in range(PARTICLE_COUNT):
+            for i in range(PARTICLE_COUNT):
                 color = random.choice(EXPLOSION_COLORS)
                 particle = Particle(enemy.rect.centerx, enemy.rect.centery, color)
                 all_sprites.add(particle)
                 
             # Эффект для strong врагов
             if enemy.enemy_type == 'strong':
-                for _ in range(PARTICLE_COUNT * 2):
+                for i in range(PARTICLE_COUNT * 2):
                     color = (255, 0, 0)
                     particle = Particle(enemy.rect.centerx, enemy.rect.centery, color)
                     particle.speed_x *= 1.5
@@ -752,7 +752,7 @@ while running:
     if current_xp >= xp_needed_current:
         levels_gained = current_xp // xp_needed_current
         UPGRADE_SOUND.play()  # Звук играет один раз при любом количестве уровней
-        for _ in range(levels_gained):
+        for i in range(levels_gained):
             player.level_up()
             player.shooting = False  # Сбрасываем состояние стрельбы
             show_upgrade_screen(player)
